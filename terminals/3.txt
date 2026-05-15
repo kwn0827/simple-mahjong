@@ -1,0 +1,6 @@
+---
+pid: 26240
+cwd: |
+  C:\Users\Keigo
+---
+PS C:\Users\Keigo>

@@ -1,131 +1,836 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>世界一やさしい麻雀教室</title>
-    <style>
-        body { background: #225522; color: white; font-family: sans-serif; text-align: center; margin: 0; }
-        .game-container { max-width: 900px; margin: auto; padding: 20px; }
-        .player-area { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; margin-top: 150px; }
-        .npc-area { display: flex; justify-content: space-around; font-size: 0.8rem; color: #ccc; }
-        .hand { display: flex; justify-content: center; gap: 4px; min-height: 80px; }
-        .tile {
-            width: 45px; height: 65px; background: #fdfdfd; color: black;
-            border-radius: 4px; font-size: 40px; line-height: 65px;
-            cursor: pointer; box-shadow: 2px 2px 0 #888; transition: 0.1s;
-        }
-        .tile:hover { transform: translateY(-10px); }
-        .tsumo-area { margin-left: 20px; border-left: 2px darkgreen; }
-        .guide { background: #fff; color: #333; padding: 10px; border-radius: 5px; margin: 15px 0; font-weight: bold; }
-        .river { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 120px; margin: auto; height: 100px; overflow: hidden; opacity: 0.6; }
-        button { padding: 12px 24px; font-size: 18px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>簡易麻雀（4人・Unicode牌）</title>
+  <style>
+    :root {
+      --felt: #0d5c36;
+      --felt-dark: #083c24;
+      --wood: #5c3d1e;
+      --ui-bg: rgba(0, 0, 0, 0.55);
+      --text: #f5f5f5;
+      --accent: #ffd54f;
+      --hint: #4fc3f7;
+      --ron: #ff5252;
+      --tile-bg: #faf8f0;
+      --tile-border: #333;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+      background: linear-gradient(160deg, var(--felt-dark), var(--felt));
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    h1 {
+      margin: 0.4rem 0 0.2rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      text-align: center;
+      text-shadow: 0 1px 2px #000;
+    }
+    /* 全体レイアウト：中央に河、下に自分、上左右にCPU */
+    #table {
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 520px) 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 6px;
+      padding: 8px;
+      max-width: 980px;
+      margin: 0 auto;
+      min-height: calc(100vh - 120px);
+    }
+    .panel {
+      background: var(--ui-bg);
+      border-radius: 10px;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .seat-label { font-size: 0.75rem; opacity: 0.9; margin-bottom: 4px; }
+    .tiles-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      min-height: 52px;
+    }
+    /* Unicode牌の見た目 */
+    .tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 56px;
+      background: var(--tile-bg);
+      border: 2px solid var(--tile-border);
+      border-radius: 6px;
+      font-size: 34px;
+      line-height: 1;
+      cursor: default;
+      user-select: none;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+      transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    }
+    .tile.clickable { cursor: pointer; }
+    .tile.clickable:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45); }
+    .tile.drawn { margin-left: 12px; border-color: #1976d2; box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.35); }
+    .tile.hint { outline: 3px solid var(--hint); animation: pulse 1.2s ease-in-out infinite; }
+    .tile.dim { opacity: 0.35; pointer-events: none; }
+    @keyframes pulse {
+      0%, 100% { outline-offset: 0; }
+      50% { outline-offset: 3px; }
+    }
+    /* 中央：4方向の河 */
+    #center {
+      grid-column: 2;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    #rivers-grid {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: start;
+    }
+    .river-box h3 { margin: 0 0 4px; font-size: 0.8rem; font-weight: 600; opacity: 0.95; }
+    .river-tiles { display: flex; flex-wrap: wrap; gap: 3px; min-height: 40px; }
+    .river-tiles .tile { width: 34px; height: 46px; font-size: 28px; }
+    /* 座席配置：上=西、左=北、右=南、下=東（自分） */
+    #seat-north { grid-column: 2; grid-row: 1; }
+    #seat-west { grid-column: 1; grid-row: 2; align-self: center; }
+    #seat-east { grid-column: 3; grid-row: 2; align-self: center; }
+    #seat-south-human { grid-column: 1 / span 3; grid-row: 3; }
+    #msg-area {
+      grid-column: 1 / span 3;
+      margin-top: 4px;
+    }
+    #status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+    #message {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      border-left: 4px solid var(--accent);
+      line-height: 1.45;
+    }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button {
+      font: inherit;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      background: #37474f;
+      color: #fff;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { background: #1565c0; }
+    button.danger { background: var(--ron); font-size: 1.1rem; padding: 10px 18px; }
+    button.riichi { background: #c62828; }
+    /* オーバーレイ：アガリ / ロン */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .overlay.show { display: flex; }
+    .overlay-card {
+      background: linear-gradient(145deg, #fff8e1, #ffe082);
+      color: #1a1a1a;
+      padding: 28px 36px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 92vw;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      border: 4px solid #ff8f00;
+    }
+    .overlay-card h2 { margin: 0 0 12px; font-size: 1.8rem; }
+    .overlay-card p { margin: 0 0 16px; font-size: 1rem; }
+    @media (max-width: 720px) {
+      .tile { width: 36px; height: 48px; font-size: 28px; }
+      #table { grid-template-columns: 1fr; grid-template-rows: auto; }
+      #seat-west, #seat-east { grid-column: 1; grid-row: auto; }
+      #center { grid-column: 1; grid-row: auto; }
+      #seat-south-human { grid-column: 1; }
+    }
+  </style>
 </head>
 <body>
-
-<div class="game-container">
-    <div class="npc-area">
-        <div>左の敵<div id="river1" class="river"></div></div>
-        <div>上の敵<div id="river2" class="river"></div></div>
-        <div>右の敵<div id="river3" class="river"></div></div>
+  <h1>簡易麻雀（4人・ノーメンツ・Unicode牌のみ）</h1>
+  <p id="turn-line" style="text-align:center;margin:0 8px 6px;font-size:0.95rem;font-weight:700;color:#fffde7;text-shadow:0 1px 2px #000;"></p>
+  <div id="table">
+    <div id="seat-north" class="panel">
+      <div class="seat-label" id="lbl-north"></div>
+      <div class="tiles-row" id="hand-north"></div>
     </div>
-
-    <div class="player-area">
-        <div id="guide" class="guide">同じのを3枚組、または123などの数字順を3枚組にしましょう！</div>
-        <div id="my-hand" class="hand"></div>
-        <div id="status" style="margin-top:20px; font-size: 1.2rem;"></div>
-        <br>
-        <button onclick="initGame()">新しく始める</button>
+    <div id="seat-west" class="panel">
+      <div class="seat-label" id="lbl-west"></div>
+      <div class="tiles-row" id="hand-west"></div>
     </div>
-</div>
+    <div id="center" class="panel">
+      <div id="rivers-grid">
+        <div class="river-box" style="grid-column:1/span 2;">
+          <h3 id="river-title-north"></h3>
+          <div class="river-tiles" id="river-north"></div>
+        </div>
+        <div class="river-box">
+          <h3 id="river-title-west"></h3>
+          <div class="river-tiles" id="river-west"></div>
+        </div>
+        <div class="river-box">
+          <h3 id="river-title-east"></h3>
+          <div class="river-tiles" id="river-east"></div>
+        </div>
+        <div class="river-box" style="grid-column:1/span 2;">
+          <h3 id="river-title-south"></h3>
+          <div class="river-tiles" id="river-south"></div>
+        </div>
+      </div>
+    </div>
+    <div id="seat-east" class="panel">
+      <div class="seat-label" id="lbl-east"></div>
+      <div class="tiles-row" id="hand-east"></div>
+    </div>
+    <div id="seat-south-human" class="panel">
+      <div class="seat-label" id="lbl-south"></div>
+      <div class="tiles-row" id="hand-south"></div>
+      <div id="msg-area">
+        <div id="status-bar">
+          <div id="message"></div>
+          <div class="controls">
+            <button type="button" id="btn-riichi" class="riichi" disabled>リーチ</button>
+            <button type="button" id="btn-new" class="primary">局をやり直す</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<script>
-    // 牌の種類定義
-    const TILE_CHARS = [
-        "🀇","🀈","🀉","🀊","🀋","🀌","🀍","🀎","🀏", // 萬子 1-9
-        "🀙","🀚","🀛","🀜","🀝","🀞","🀟","🀠","🀡", // 筒子 1-9
-        "🀐","🀑","🀒","🀓","🀔","🀕","🀖","🀗","🀘", // 索子 1-9
-        "🀀","🀁","🀂","🀃","🀄","🀅","🀆"          // 字牌
-    ];
+  <!-- ツモ和了オーバーレイ -->
+  <div id="overlay-win" class="overlay" role="dialog" aria-modal="true">
+    <div class="overlay-card">
+      <h2>アガリ（勝利）！</h2>
+      <p id="win-detail"></p>
+      <button type="button" id="btn-win-close" class="primary">閉じる</button>
+    </div>
+  </div>
+  <!-- ロン机会オーバーレイ -->
+  <div id="overlay-ron" class="overlay" role="dialog" aria-modal="true">
+    <div class="overlay-card" style="border-color:#d32f2f;background:linear-gradient(145deg,#ffebee,#ffcdd2);">
+      <h2>ロン！</h2>
+      <p>捨て牌で和了できます。ロンしますか？</p>
+      <div class="controls" style="justify-content:center;">
+        <button type="button" id="btn-ron" class="danger">ロン！</button>
+        <button type="button" id="btn-ron-pass">見送る</button>
+      </div>
+    </div>
+  </div>
 
-    let deck = [];
-    let myHand = [];
-    let tsumoTile = null;
+  <script>
+  (function () {
+    'use strict';
 
-    function initGame() {
-        deck = [];
-        TILE_CHARS.forEach(char => { for(let i=0; i<4; i++) deck.push(char); });
-        shuffle(deck);
-        
-        myHand = deck.splice(0, 13);
-        myHand.sort();
-        nextTurn();
+    // =============================================================================
+    // 本スクリプトは「教育用の極小ルール麻雀」です。
+    // - 技術スタック：HTML/CSS/素の JavaScript のみ（CDN・画像・Canvas ライブラリなし）
+    // - 牌表示：Unicode 麻雀牌ブロック（🀇〜🀏 等）のみ
+    // - 4人対局：東（下＝人間） vs 南（右CPU） vs 西（上CPU） vs 北（左CPU）
+    // - 鳴きなし（ポン・チー・カン不可）・門前手のみ
+    // - 和了形：一般形（面子4＋雀頭1）。役は判定しません（役なしでも可とする）
+    // - リーチ：テンパイ時にボタン→この巡はツモ切りのみ（簡易ロック）
+    // - ロン：他家の捨て牌で人間の13枚が完成したらオーバーレイで宣言
+    // 実装の読み方：上から「牌表現」→「和了判定」→「評価関数」→「状態機械」→「描画」
+    // =============================================================================
+
+    // =============================================================================
+    // 定数・牌インデックス
+    // 牌は 0..33 のインデックスで表す（萬0-8、筒9-17、索18-26、字牌27-33）
+    // 字牌の順：東南西北白發中（🀀🀁🀂🀃🀆🀅🀄 に対応）
+    // =============================================================================
+    const TILE_TYPES = 34;
+    const SEAT_EAST = 0;   // 自分（下）
+    const SEAT_SOUTH = 1;  // 右のCPU
+    const SEAT_WEST = 2;   // 上のCPU
+    const SEAT_NORTH = 3;  // 左のCPU
+
+    const SEAT_NAMES = ['東（自分）', '南（右）', '西（上）', '北（左）'];
+
+    /** Unicode 麻雀牌 1文字を返す（外部画像なし） */
+    function tileUnicode(idx) {
+      if (idx >= 0 && idx <= 8) return String.fromCodePoint(0x1f007 + idx);      // 🀇-🀏 萬子
+      if (idx >= 9 && idx <= 17) return String.fromCodePoint(0x1f019 + (idx - 9)); // 🀙-🀡 筒子
+      if (idx >= 18 && idx <= 26) return String.fromCodePoint(0x1f010 + (idx - 18)); // 🀐-🀘 索子
+      const honorMap = {
+        27: 0x1f000, // 東 🀀
+        28: 0x1f001, // 南 🀁
+        29: 0x1f002, // 西 🀂
+        30: 0x1f003, // 北 🀃
+        31: 0x1f006, // 白 🀆
+        32: 0x1f005, // 發 🀅
+        33: 0x1f004  // 中 🀄
+      };
+      return String.fromCodePoint(honorMap[idx] || 0x1f004);
     }
 
-    function shuffle(a) {
-        for (let i = a.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [a[i], a[j]] = [a[j], a[i]];
+    /** 136枚の山を生成（萬筒索1-9×4、風×4、三元×4） */
+    function buildDeck() {
+      const deck = [];
+      for (let t = 0; t < TILE_TYPES; t++) {
+        for (let k = 0; k < 4; k++) deck.push(t);
+      }
+      return deck;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // =============================================================================
+    // 和了判定：面子は「順子（数牌のみ）」か「刻子」。七対子は対象外。
+    // アルゴリズム：雀頭候補を全試行し、残り12枚を再帰で4面子に分割できるか判定。
+    // =============================================================================
+
+    /** counts: 長さ34の枚数配列 */
+    function cloneCounts(c) {
+      return c.slice();
+    }
+
+    /** 面子を4つ取り切れるか（雀頭は既に除いた12枚＝4グループ想定でも可） */
+    function decomposeMentsu(counts, groupsLeft) {
+      let i = 0;
+      while (i < TILE_TYPES && counts[i] === 0) i++;
+      if (i === TILE_TYPES) return groupsLeft === 0;
+
+      if (groupsLeft <= 0) return false;
+
+      // 刻子
+      if (counts[i] >= 3) {
+        counts[i] -= 3;
+        if (decomposeMentsu(counts, groupsLeft - 1)) {
+          counts[i] += 3;
+          return true;
         }
-    }
+        counts[i] += 3;
+      }
 
-    function nextTurn() {
-        // NPC3人が一瞬で牌を引いて捨てる（演出）
-        for(let i=1; i<=3; i++) {
-            let d = deck.pop();
-            const river = document.getElementById(`river${i}`);
-            const span = document.createElement('span');
-            span.innerText = d;
-            river.appendChild(span);
+      // 順子（数牌のみ、かつ同種で rank<=7 から開始）
+      if (i < 27 && (i % 9) <= 6 && counts[i] >= 1 && counts[i + 1] >= 1 && counts[i + 2] >= 1) {
+        counts[i]--; counts[i + 1]--; counts[i + 2]--;
+        if (decomposeMentsu(counts, groupsLeft - 1)) {
+          counts[i]++; counts[i + 1]++; counts[i + 2]++;
+          return true;
         }
+        counts[i]++; counts[i + 1]++; counts[i + 2]++;
+      }
 
-        tsumoTile = deck.pop();
-        render();
-        updateGuide();
+      return false;
     }
 
-    function discard(index) {
-        if(index === -1) { 
-            // ツモ切り
+    /** 14枚が標準形（4面子+1雀頭）か */
+    function isWinningHand(tileIndices) {
+      if (tileIndices.length !== 14) return false;
+      const c = new Array(TILE_TYPES).fill(0);
+      for (const t of tileIndices) c[t]++;
+
+      for (let pair = 0; pair < TILE_TYPES; pair++) {
+        if (c[pair] < 2) continue;
+        const cc = cloneCounts(c);
+        cc[pair] -= 2;
+        if (decomposeMentsu(cc, 4)) return true;
+      }
+      return false;
+    }
+
+    /** 手牌インデックス配列から counts を作る */
+    function toCounts(tiles) {
+      const c = new Array(TILE_TYPES).fill(0);
+      for (const t of tiles) c[t]++;
+      return c;
+    }
+
+    /** 13枚がテンパイか（どれか1枚ツモれば和了可能） */
+    function isTenpai13(tiles13) {
+      if (tiles13.length !== 13) return false;
+      const base = toCounts(tiles13);
+      for (let add = 0; add < TILE_TYPES; add++) {
+        const c = base.slice();
+        c[add]++;
+        if (isWinningHandFromCounts14(c)) return true;
+      }
+      return false;
+    }
+
+    /** counts の合計が14で和了形か（雀頭ループ） */
+    function isWinningHandFromCounts14(c) {
+      let sum = 0;
+      for (let i = 0; i < TILE_TYPES; i++) sum += c[i];
+      if (sum !== 14) return false;
+      for (let pair = 0; pair < TILE_TYPES; pair++) {
+        if (c[pair] < 2) continue;
+        const cc = cloneCounts(c);
+        cc[pair] -= 2;
+        if (decomposeMentsu(cc, 4)) return true;
+      }
+      return false;
+    }
+
+    /** リーチ可能：14枚のうちどれかを捨てた後の13枚がテンパイになる捨てが存在する（簡易：門前想定） */
+    function canRiichi14(hand14) {
+      if (hand14.length !== 14) return false;
+      for (let di = 0; di < hand14.length; di++) {
+        const rest = hand14.filter((_, j) => j !== di);
+        if (isTenpai13(rest)) return true;
+      }
+      return false;
+    }
+
+    /** 捨て牌 discardTile がロン牌か：手牌13枚 + 捨て1枚 */
+    function canRon13(hand13, discardTile) {
+      if (hand13.length !== 13) return false;
+      const t = hand13.concat(discardTile);
+      return isWinningHand(t);
+    }
+
+    // =============================================================================
+    // 手牌評価（CPU捨て牌・ヒント用ヒューリスティック）
+    // 方針：
+    //  - 「残り13枚の将来性」を粗いスコア化（完全向聴数ではなく近似）
+    //  - 対子（同種2枚）・三面張の素片（同種で隣接2枚）に加点
+    //  - 孤立した字牌（1枚だけ）を捨てやすくする（減点＝手に残す価値が低い）
+    //  - 刻子完成（3枚）に加点
+    // これは「ランダムよりマシ」で、初心者ヒントとしても「無難な打牌」を示す。
+    // =============================================================================
+    function handStructureScore13(tiles13) {
+      const c = toCounts(tiles13);
+      let score = 0;
+      for (let i = 0; i < TILE_TYPES; i++) {
+        const n = c[i];
+        if (n === 0) continue;
+        if (n >= 2) score += 6 * (n >= 3 ? 2 : 1); // 対子/刻子寄与
+        if (i < 27) {
+          const r = i % 9;
+          // 隣接枚数（順子の素）
+          if (r >= 1 && c[i - 1] >= 1) score += 3;
+          if (r <= 7 && c[i + 1] >= 1) score += 3;
+          if (r >= 2 && c[i - 2] >= 1 && c[i - 1] >= 1) score += 2;
+          if (r <= 6 && c[i + 1] >= 1 && c[i + 2] >= 1) score += 2;
         } else {
-            myHand.push(tsumoTile);
-            myHand.splice(index, 1);
-            myHand.sort();
+          // 字牌：孤立1枚はマイナス（捨て候補になりやすい）
+          if (n === 1) score -= 4;
         }
-        tsumoTile = null;
-        nextTurn();
+      }
+      return score;
     }
 
-    function updateGuide() {
-        // 本来は複雑な判定ですが、初心者のために「牌の種類数」で簡易的にアドバイス
-        const uniqueTiles = new Set([...myHand, tsumoTile]).size;
-        let msg = "いい感じ！同じ絵柄か、連続した数字を3つ集めて！";
-        if(uniqueTiles < 7) msg = "あと少しで揃いそう！同じ牌を大事に持って！";
-        document.getElementById('guide').innerText = msg;
-    }
-
-    function render() {
-        const handDiv = document.getElementById('my-hand');
-        handDiv.innerHTML = '';
-
-        myHand.forEach((tile, i) => {
-            const el = document.createElement('div');
-            el.className = 'tile';
-            el.innerText = tile;
-            el.onclick = () => discard(i);
-            handDiv.appendChild(el);
-        });
-
-        if (tsumoTile) {
-            const el = document.createElement('div');
-            el.className = 'tile tsumo-area';
-            el.innerText = tsumoTile;
-            el.onclick = () => discard(-1);
-            handDiv.appendChild(el);
+    /** 14枚から捨てた後のスコアが最大になるインデックスを選ぶ（同点ならランダム揺らぎ） */
+    function pickDiscardByHeuristic(hand14) {
+      let bestI = 0;
+      let bestS = -1e9;
+      for (let i = 0; i < hand14.length; i++) {
+        const rest = hand14.filter((_, j) => j !== i);
+        const s = handStructureScore13(rest) + (Math.random() * 0.01);
+        if (s > bestS) {
+          bestS = s;
+          bestI = i;
         }
+      }
+      return bestI;
     }
 
-    initGame();
-</script>
+    /** 自分の手番：ヒントとして「この打牌が無難」インデックス（上と同じ評価） */
+    function hintDiscardIndex(hand14) {
+      return pickDiscardByHeuristic(hand14);
+    }
+
+    // =============================================================================
+    // ゲーム状態
+    // =============================================================================
+    const state = {
+      wall: [],
+      wallIndex: 0,
+      hands: [[], [], [], []], // 各座席の手牌（裏向きCPUも同じ配列で管理）
+      rivers: [[], [], [], []],
+      current: SEAT_EAST,
+      phase: 'idle', // idle | human_turn | cpu_think | ended | ron_prompt
+      drawnIndex: -1, // 今ツモった牌が手配のどのインデックスか（-1は不明扱い）
+      humanRiichi: false,
+      pendingRon: null, // { discardSeat, tile, fromTurnSnapshot }
+      gameOver: false
+    };
+
+    const els = {
+      handNorth: document.getElementById('hand-north'),
+      handEast: document.getElementById('hand-east'),
+      handWest: document.getElementById('hand-west'),
+      handSouth: document.getElementById('hand-south'),
+      riverNorth: document.getElementById('river-north'),
+      riverEast: document.getElementById('river-east'),
+      riverWest: document.getElementById('river-west'),
+      riverSouth: document.getElementById('river-south'),
+      lblNorth: document.getElementById('lbl-north'),
+      lblEast: document.getElementById('lbl-east'),
+      lblWest: document.getElementById('lbl-west'),
+      lblSouth: document.getElementById('lbl-south'),
+      rtNorth: document.getElementById('river-title-north'),
+      rtEast: document.getElementById('river-title-east'),
+      rtWest: document.getElementById('river-title-west'),
+      rtSouth: document.getElementById('river-title-south'),
+      message: document.getElementById('message'),
+      btnRiichi: document.getElementById('btn-riichi'),
+      btnNew: document.getElementById('btn-new'),
+      overlayWin: document.getElementById('overlay-win'),
+      overlayRon: document.getElementById('overlay-ron'),
+      winDetail: document.getElementById('win-detail'),
+      btnWinClose: document.getElementById('btn-win-close'),
+      btnRon: document.getElementById('btn-ron'),
+      btnRonPass: document.getElementById('btn-ron-pass'),
+      turnLine: document.getElementById('turn-line')
+    };
+
+    function setMessage(text) {
+      els.message.textContent = text;
+    }
+
+    /** 描画：CPU手牌は裏（指定外のため Unicode 裏牌は使わず茶色のマスク表示） */
+    function renderCpuHand(seat, container) {
+      container.innerHTML = '';
+      const n = state.hands[seat].length;
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('span');
+        d.className = 'tile';
+        d.textContent = '■';
+        d.title = '相手の手牌（非表示）';
+        d.style.fontSize = '18px';
+        d.style.color = '#222';
+        d.style.background = '#8d6e63';
+        container.appendChild(d);
+      }
+    }
+
+    /**
+     * 人間手牌の描画：理牌（数値順）しつつ、ツモ牌（drawnIndex）だけ右へ少し離す。
+     * クリックで打牌。リーチ後はツモ牌のみ操作可能（他家視点の「摸切り」簡易ルール）。
+     */
+    function renderHumanHandV2() {
+      const container = els.handSouth;
+      container.innerHTML = '';
+      const hand = state.hands[SEAT_EAST];
+      if (hand.length === 0) return;
+
+      const di = state.drawnIndex;
+      const base = [];
+      for (let j = 0; j < hand.length; j++) {
+        if (j === di) continue;
+        base.push({ idx: j, t: hand[j] });
+      }
+      base.sort((a, b) => a.t - b.t);
+
+      const hint = (state.phase === 'human_turn' && hand.length >= 14 && !state.gameOver)
+        ? hintDiscardIndex(hand)
+        : -1;
+
+      const lockedRiichi = state.humanRiichi && di >= 0;
+
+      base.forEach(({ idx, t }) => {
+        const span = document.createElement('span');
+        span.className = 'tile';
+        span.textContent = tileUnicode(t);
+        span.dataset.idx = String(idx);
+        if (state.phase === 'human_turn' && !state.gameOver && !lockedRiichi) {
+          span.classList.add('clickable');
+          if (idx === hint) span.classList.add('hint');
+          span.addEventListener('click', () => humanDiscard(idx));
+        } else if (lockedRiichi) {
+          span.classList.add('dim');
+        }
+        container.appendChild(span);
+      });
+
+      if (di >= 0 && di < hand.length) {
+        const span = document.createElement('span');
+        span.className = 'tile drawn';
+        span.textContent = tileUnicode(hand[di]);
+        span.dataset.idx = String(di);
+        if (state.phase === 'human_turn' && !state.gameOver) {
+          span.classList.add('clickable');
+          if (di === hint) span.classList.add('hint');
+          span.addEventListener('click', () => humanDiscard(di));
+        }
+        container.appendChild(span);
+      }
+    }
+
+    function renderRivers() {
+      const mapSeatToRiverEl = [els.riverSouth, els.riverEast, els.riverNorth, els.riverWest];
+      const titles = [els.rtSouth, els.rtEast, els.rtNorth, els.rtWest];
+      for (let s = 0; s < 4; s++) {
+        titles[s].textContent = SEAT_NAMES[s] + ' の河';
+        const box = mapSeatToRiverEl[s];
+        box.innerHTML = '';
+        for (const t of state.rivers[s]) {
+          const span = document.createElement('span');
+          span.className = 'tile';
+          span.textContent = tileUnicode(t);
+          box.appendChild(span);
+        }
+      }
+    }
+
+    function renderLabels() {
+      els.lblSouth.textContent = SEAT_NAMES[SEAT_EAST] + ' — あなた';
+      els.lblEast.textContent = SEAT_NAMES[SEAT_SOUTH];
+      els.lblNorth.textContent = SEAT_NAMES[SEAT_WEST];
+      els.lblWest.textContent = SEAT_NAMES[SEAT_NORTH];
+    }
+
+    function renderAll() {
+      renderLabels();
+      renderHumanHandV2();
+      renderCpuHand(SEAT_SOUTH, els.handEast);
+      renderCpuHand(SEAT_WEST, els.handNorth);
+      renderCpuHand(SEAT_NORTH, els.handWest);
+      renderRivers();
+
+      const isHumanTurn = state.phase === 'human_turn';
+      els.btnRiichi.disabled = !(isHumanTurn && !state.humanRiichi && state.hands[SEAT_EAST].length === 14 && canRiichi14(state.hands[SEAT_EAST]));
+
+      // ナビゲーション：誰の番かを大きく明示（初心者向け）。終了・ロン判断を先に判定する。
+      if (state.phase === 'ended') {
+        els.turnLine.textContent = '局終了';
+      } else if (state.phase === 'ron_prompt') {
+        els.turnLine.textContent = 'ロン判断（あなた）';
+      } else if (state.phase === 'human_turn') {
+        els.turnLine.textContent = '自分の番（' + SEAT_NAMES[SEAT_EAST] + '）';
+      } else if (state.phase === 'cpu_think') {
+        els.turnLine.textContent = 'CPUの番（' + SEAT_NAMES[state.current] + '）';
+      } else {
+        els.turnLine.textContent = 'CPUの番（' + SEAT_NAMES[state.current] + '）';
+      }
+
+      if (state.current === SEAT_EAST && isHumanTurn) {
+        setMessage('ツモしました。捨てる牌を選んでください（水色の枠は「無難な打牌」のヒントです）。');
+      } else if (state.phase === 'cpu_think') {
+        setMessage(SEAT_NAMES[state.current] + ' の番です。相手が考えています…（約0.5秒）');
+      } else if (state.phase === 'ron_prompt') {
+        setMessage('捨て牌で和了できます。大きな「ロン！」ボタンか見送りを選んでください。');
+      } else if (state.phase === 'ended') {
+        setMessage('この局は終了しました。「局をやり直す」で新しい一局を開始できます。');
+      } else {
+        setMessage('相手の番です。しばらくお待ちください。');
+      }
+    }
+
+    /**
+     * 山から1枚ツモる。人間（東）のときだけ drawnIndex を更新し、UIでツモ牌を分離表示する。
+     * CPU がツモるときに drawnIndex を上書きしないことが重要（人間側の表示が崩れるため）。
+     */
+    function drawTile(seat) {
+      if (state.wallIndex >= state.wall.length) return null;
+      const t = state.wall[state.wallIndex++];
+      state.hands[seat].push(t);
+      if (seat === SEAT_EAST) {
+        state.drawnIndex = state.hands[seat].length - 1;
+      }
+      return t;
+    }
+
+    function nextSeat(s) {
+      return (s + 1) % 4;
+    }
+
+    function startKyoku() {
+      state.wall = shuffle(buildDeck());
+      state.wallIndex = 0;
+      state.hands = [[], [], [], []];
+      state.rivers = [[], [], [], []];
+      state.current = SEAT_EAST;
+      state.phase = 'idle';
+      state.drawnIndex = -1;
+      state.humanRiichi = false;
+      state.pendingRon = null;
+      state.gameOver = false;
+
+      for (let r = 0; r < 3; r++) {
+        for (let s = 0; s < 4; s++) {
+          for (let k = 0; k < 4; k++) {
+            state.hands[s].push(state.wall[state.wallIndex++]);
+          }
+        }
+      }
+      for (let s = 0; s < 4; s++) {
+        state.hands[s].push(state.wall[state.wallIndex++]);
+      }
+      // 各13枚、親（東＝自分）が最初にツモる
+      drawTile(SEAT_EAST);
+      state.phase = 'human_turn';
+      renderAll();
+      afterHumanDrawChecks();
+    }
+
+    /** ツモ後：和了チェック（ツモ） */
+    function afterHumanDrawChecks() {
+      const h = state.hands[SEAT_EAST];
+      if (h.length === 14 && isWinningHand(h)) {
+        showWin('ツモ和了（役は不問・標準形のみ判定）');
+      }
+    }
+
+    function showWin(detail) {
+      state.gameOver = true;
+      state.phase = 'ended';
+      els.winDetail.textContent = detail;
+      els.overlayWin.classList.add('show');
+      renderAll();
+    }
+
+    function humanDeclareRiichi() {
+      if (!els.btnRiichi.disabled) {
+        state.humanRiichi = true;
+        setMessage('リーチ宣言しました。この巡はツモ切りのみ可能です。');
+        renderAll();
+      }
+    }
+
+    function humanDiscard(index) {
+      if (state.phase !== 'human_turn' || state.gameOver) return;
+      const h = state.hands[SEAT_EAST];
+      if (index < 0 || index >= h.length) return;
+      if (state.humanRiichi && state.drawnIndex >= 0 && index !== state.drawnIndex) {
+        setMessage('リーチ後はツモ切りのみです。');
+        return;
+      }
+      const tile = h.splice(index, 1)[0];
+      state.rivers[SEAT_EAST].push(tile);
+      state.drawnIndex = -1;
+      state.phase = 'cpu_think';
+      renderAll();
+      proceedAfterDiscard(SEAT_EAST, tile);
+    }
+
+    /** 捨て後：ロン確認（人間のみ）→次の手番へ */
+    function proceedAfterDiscard(discardSeat, tile) {
+      if (discardSeat !== SEAT_EAST && state.hands[SEAT_EAST].length === 13) {
+        if (canRon13(state.hands[SEAT_EAST], tile)) {
+          state.pendingRon = { discardSeat, tile };
+          state.phase = 'ron_prompt';
+          els.overlayRon.classList.add('show');
+          setMessage('ロン可能です！');
+          renderAll();
+          return;
+        }
+      }
+      advanceTurnAfterDiscard();
+    }
+
+    function advanceTurnAfterDiscard() {
+      state.current = nextSeat(state.current);
+      cpuOrHumanStep();
+    }
+
+    function cpuOrHumanStep() {
+      if (state.wallIndex >= state.wall.length) {
+        state.phase = 'ended';
+        setMessage('山が尽きました（流局）。「局をやり直す」で再開できます。');
+        renderAll();
+        return;
+      }
+
+      if (state.current === SEAT_EAST) {
+        const drew = drawTile(SEAT_EAST);
+        if (drew === null) {
+          state.phase = 'ended';
+          setMessage('山が尽きました（流局）。');
+          renderAll();
+          return;
+        }
+        state.phase = 'human_turn';
+        renderAll();
+        afterHumanDrawChecks();
+        return;
+      }
+
+      state.phase = 'cpu_think';
+      renderAll();
+      window.setTimeout(() => {
+        cpuTurnDiscard();
+      }, 520);
+    }
+
+    function cpuTurnDiscard() {
+      const s = state.current;
+      if (state.wallIndex >= state.wall.length) {
+        state.phase = 'ended';
+        setMessage('山が尽きました（流局）。');
+        renderAll();
+        return;
+      }
+      const drew = drawTile(s);
+      if (drew === null) {
+        state.phase = 'ended';
+        setMessage('山が尽きました（流局）。');
+        renderAll();
+        return;
+      }
+      const hand = state.hands[s];
+      const di = pickDiscardByHeuristic(hand);
+      const tile = hand.splice(di, 1)[0];
+      state.rivers[s].push(tile);
+      state.drawnIndex = -1;
+      renderAll();
+      proceedAfterDiscard(s, tile);
+    }
+
+    els.btnRon.addEventListener('click', () => {
+      if (!state.pendingRon) return;
+      const { tile } = state.pendingRon;
+      els.overlayRon.classList.remove('show');
+      showWin('ロン和了（捨て牌：' + tileUnicode(tile) + '）。標準形を満たします。');
+      state.pendingRon = null;
+    });
+
+    els.btnRonPass.addEventListener('click', () => {
+      els.overlayRon.classList.remove('show');
+      state.pendingRon = null;
+      advanceTurnAfterDiscard();
+      renderAll();
+    });
+
+    els.btnWinClose.addEventListener('click', () => {
+      els.overlayWin.classList.remove('show');
+    });
+
+    els.btnNew.addEventListener('click', startKyoku);
+    els.btnRiichi.addEventListener('click', humanDeclareRiichi);
+
+    // 初期局
+    startKyoku();
+  })();
+  </script>
 </body>
 </html>

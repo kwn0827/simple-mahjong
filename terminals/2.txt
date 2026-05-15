@@ -1,0 +1,9 @@
+---
+pid: 8224
+cwd: |
+  C:\Users\Keigo
+---
+PS C:\Users\Keigo>
+ *  History restored 
+
+PS C:\Users\Keigo> 

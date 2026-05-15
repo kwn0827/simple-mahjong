@@ -1,0 +1,12 @@
+---
+pid: 21132
+cwd: |
+  C:\Users\Keigo
+---
+PS C:\Users\Keigo>
+ *  History restored 
+
+PS C:\Users\Keigo> 
+ *  History restored 
+
+PS C:\Users\Keigo> 
