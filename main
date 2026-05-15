@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>超シンプル麻雀</title>
+    <style>
+        body { background: #225522; color: white; font-family: sans-serif; text-align: center; }
+        .board { display: flex; justify-content: center; gap: 10px; margin-top: 50px; }
+        .tile {
+            width: 50px; height: 70px; background: white; color: black;
+            border-radius: 5px; line-height: 70px; font-size: 24px; font-weight: bold;
+            cursor: pointer; border: 2px solid #666;
+        }
+        .tile:hover { background: #eee; }
+        .info { margin-top: 20px; font-size: 20px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🀄 超シンプル麻雀 🀄</h1>
+    <p>同じ数字を3枚、または階段(123など)を3セット作りましょう！</p>
+    
+    <div id="hand" class="board"></div>
+    <div class="info">
+        <span id="status">自分の番です。捨てる牌を選んでください。</span><br><br>
+        <button onclick="resetGame()">ゲームをやり直す</button>
+    </div>
+
+    <script>
+        // 牌のデータ (萬子 1-9 を各4枚)
+        let deck = [];
+        let hand = [];
+
+        function initDeck() {
+            deck = [];
+            for (let i = 1; i <= 9; i++) {
+                for (let j = 0; j < 4; j++) deck.push(i);
+            }
+            deck.sort(() => Math.random() - 0.5);
+        }
+
+        function drawTile() {
+            if (deck.length > 0) hand.push(deck.pop());
+            render();
+            checkWin();
+        }
+
+        function discard(index) {
+            hand.splice(index, 1);
+            if (deck.length === 0) {
+                document.getElementById('status').innerText = "流局（引き分け）です。";
+                return;
+            }
+            drawTile();
+        }
+
+        function render() {
+            const handDiv = document.getElementById('hand');
+            handDiv.innerHTML = '';
+            hand.sort((a, b) => a - b).forEach((tile, index) => {
+                const el = document.createElement('div');
+                el.className = 'tile';
+                el.innerText = tile;
+                el.onclick = () => discard(index);
+                handDiv.appendChild(el);
+            });
+        }
+
+        // 簡易アガリ判定 (3枚セット×3 + 2枚)
+        function checkWin() {
+            // 本来は再帰的に判定しますが、ここでは超簡易的に「揃った！」というログを出す準備
+            // 実際の実装ではここに役判定ロジックを追加します
+            console.log("現在の形:", hand);
+        }
+
+        function resetGame() {
+            initDeck();
+            hand = [];
+            for (let i = 0; i < 10; i++) hand.push(deck.pop()); // 10枚配る
+            drawTile(); // 11枚目（ツモ）
+            document.getElementById('status').innerText = "捨てる牌を選んでください。";
+        }
+
+        resetGame();
+    </script>
+</body>
+</html>
