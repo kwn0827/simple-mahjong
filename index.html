@@ -2,163 +2,127 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unicode Mahjong Beta</title>
+    <title>世界一やさしい麻雀教室</title>
     <style>
-        body { background: #1a4a1a; color: white; font-family: 'Segoe UI Emoji', sans-serif; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .board { background: #2e7d32; border: 10px solid #5d4037; border-radius: 10px; padding: 20px; margin-bottom: 20px; min-height: 200px; }
-        .hand { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 50px; }
+        body { background: #225522; color: white; font-family: sans-serif; text-align: center; margin: 0; }
+        .game-container { max-width: 900px; margin: auto; padding: 20px; }
+        .player-area { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; margin-top: 150px; }
+        .npc-area { display: flex; justify-content: space-around; font-size: 0.8rem; color: #ccc; }
+        .hand { display: flex; justify-content: center; gap: 4px; min-height: 80px; }
         .tile {
-            width: 50px; height: 70px; background: #f5f5f5; color: #000;
-            border-radius: 4px; font-size: 45px; line-height: 70px;
-            cursor: pointer; user-select: none; transition: transform 0.1s;
-            box-shadow: 2px 2px 0 #999;
+            width: 45px; height: 65px; background: #fdfdfd; color: black;
+            border-radius: 4px; font-size: 40px; line-height: 65px;
+            cursor: pointer; box-shadow: 2px 2px 0 #888; transition: 0.1s;
         }
-        .tile:hover { transform: translateY(-10px); background: #fff; }
-        .tile.tsumo { margin-left: 15px; border: 2px solid #ffeb3b; }
-        .info { background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; }
-        .msg { font-size: 1.2rem; color: #ffeb3b; margin: 10px 0; min-height: 1.5em; }
-        button { padding: 10px 20px; font-size: 1rem; border: none; border-radius: 5px; cursor: pointer; background: #ff9800; color: white; }
-        button:hover { background: #f57c00; }
+        .tile:hover { transform: translateY(-10px); }
+        .tsumo-area { margin-left: 20px; border-left: 2px darkgreen; }
+        .guide { background: #fff; color: #333; padding: 10px; border-radius: 5px; margin: 15px 0; font-weight: bold; }
+        .river { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; width: 120px; margin: auto; height: 100px; overflow: hidden; opacity: 0.6; }
+        button { padding: 12px 24px; font-size: 18px; background: #ff9800; color: white; border: none; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Unicode 1人麻雀</h1>
-    <div class="board">
-        <div id="hand" class="hand"></div>
+<div class="game-container">
+    <div class="npc-area">
+        <div>左の敵<div id="river1" class="river"></div></div>
+        <div>上の敵<div id="river2" class="river"></div></div>
+        <div>右の敵<div id="river3" class="river"></div></div>
     </div>
-    <div class="info">
-        <div id="status" class="msg">牌を選んで捨ててください</div>
-        <div id="message" class="msg"></div>
-        <button onclick="initGame()">ニューゲーム</button>
+
+    <div class="player-area">
+        <div id="guide" class="guide">同じのを3枚組、または123などの数字順を3枚組にしましょう！</div>
+        <div id="my-hand" class="hand"></div>
+        <div id="status" style="margin-top:20px; font-size: 1.2rem;"></div>
+        <br>
+        <button onclick="initGame()">新しく始める</button>
     </div>
 </div>
 
 <script>
-    // Unicode 麻雀牌データ (萬子, 筒子, 索子, 字牌)
-    const TILE_MAP = [
-        ...Array.from({length: 9}, (_, i) => ({ id: i, char: String.fromCodePoint(0x1F007 + i), type: 'm', val: i + 1 })), // 萬子
-        ...Array.from({length: 9}, (_, i) => ({ id: i + 9, char: String.fromCodePoint(0x1F019 + i), type: 'p', val: i + 1 })), // 筒子
-        ...Array.from({length: 9}, (_, i) => ({ id: i + 18, char: String.fromCodePoint(0x1F010 + i), type: 's', val: i + 1 })), // 索子
-        ...Array.from({length: 7}, (_, i) => ({ id: i + 27, char: String.fromCodePoint(0x1F000 + i), type: 'z', val: i + 1 }))  // 字牌
+    // 牌の種類定義
+    const TILE_CHARS = [
+        "🀇","🀈","🀉","🀊","🀋","🀌","🀍","🀎","🀏", // 萬子 1-9
+        "🀙","🀚","🀛","🀜","🀝","🀞","🀟","🀠","🀡", // 筒子 1-9
+        "🀐","🀑","🀒","🀓","🀔","🀕","🀖","🀗","🀘", // 索子 1-9
+        "🀀","🀁","🀂","🀃","🀄","🀅","🀆"          // 字牌
     ];
 
     let deck = [];
-    let hand = [];
-    let currentTsumo = null;
+    let myHand = [];
+    let tsumoTile = null;
 
     function initGame() {
-        // 山を作成（各4枚）
         deck = [];
-        TILE_MAP.forEach(t => {
-            for(let i=0; i<4; i++) deck.push({...t});
-        });
+        TILE_CHARS.forEach(char => { for(let i=0; i<4; i++) deck.push(char); });
         shuffle(deck);
-
-        // 13枚配牌
-        hand = deck.splice(0, 13);
-        sortHand();
-        tsumo();
+        
+        myHand = deck.splice(0, 13);
+        myHand.sort();
+        nextTurn();
     }
 
-    function shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
+    function shuffle(a) {
+        for (let i = a.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
+            [a[i], a[j]] = [a[j], a[i]];
         }
     }
 
-    function sortHand() {
-        hand.sort((a, b) => a.id - b.id);
-    }
-
-    function tsumo() {
-        if (deck.length === 0) {
-            document.getElementById('status').innerText = "流局です。";
-            return;
+    function nextTurn() {
+        // NPC3人が一瞬で牌を引いて捨てる（演出）
+        for(let i=1; i<=3; i++) {
+            let d = deck.pop();
+            const river = document.getElementById(`river${i}`);
+            const span = document.createElement('span');
+            span.innerText = d;
+            river.appendChild(span);
         }
-        currentTsumo = deck.pop();
+
+        tsumoTile = deck.pop();
         render();
-        if (checkWin([...hand, currentTsumo])) {
-            document.getElementById('message').innerText = "🎉 ホーラ（アガリ）！ 🎉";
-        } else {
-            document.getElementById('message').innerText = "";
-        }
+        updateGuide();
     }
 
     function discard(index) {
-        // 手牌かツモ牌を入れ替える処理
-        if (index === -1) {
-            // ツモ切り（何もしない）
+        if(index === -1) { 
+            // ツモ切り
         } else {
-            const temp = hand[index];
-            hand[index] = currentTsumo;
-            currentTsumo = temp; // 捨てる牌を一時的にツモ牌扱いにしてから排除
+            myHand.push(tsumoTile);
+            myHand.splice(index, 1);
+            myHand.sort();
         }
-        currentTsumo = null;
-        sortHand();
-        tsumo();
+        tsumoTile = null;
+        nextTurn();
+    }
+
+    function updateGuide() {
+        // 本来は複雑な判定ですが、初心者のために「牌の種類数」で簡易的にアドバイス
+        const uniqueTiles = new Set([...myHand, tsumoTile]).size;
+        let msg = "いい感じ！同じ絵柄か、連続した数字を3つ集めて！";
+        if(uniqueTiles < 7) msg = "あと少しで揃いそう！同じ牌を大事に持って！";
+        document.getElementById('guide').innerText = msg;
     }
 
     function render() {
-        const handDiv = document.getElementById('hand');
+        const handDiv = document.getElementById('my-hand');
         handDiv.innerHTML = '';
 
-        hand.forEach((tile, i) => {
+        myHand.forEach((tile, i) => {
             const el = document.createElement('div');
             el.className = 'tile';
-            el.innerHTML = tile.char;
+            el.innerText = tile;
             el.onclick = () => discard(i);
             handDiv.appendChild(el);
         });
 
-        if (currentTsumo) {
+        if (tsumoTile) {
             const el = document.createElement('div');
-            el.className = 'tile tsumo';
-            el.innerHTML = currentTsumo.char;
+            el.className = 'tile tsumo-area';
+            el.innerText = tsumoTile;
             el.onclick = () => discard(-1);
             handDiv.appendChild(el);
         }
-    }
-
-    // 簡易アガリ判定ロジック (4面子1雀頭)
-    function checkWin(allTiles) {
-        const counts = Array(34).fill(0);
-        allTiles.forEach(t => counts[TILE_MAP.findIndex(tm => tm.id === t.id)]++);
-
-        for (let i = 0; i < 34; i++) {
-            if (counts[i] >= 2) {
-                const copy = [...counts];
-                copy[i] -= 2; // 雀頭（ペア）を仮定
-                if (canFormMentsu(copy)) return true;
-            }
-        }
-        return false;
-    }
-
-    function canFormMentsu(counts) {
-        if (counts.every(c => c === 0)) return true;
-
-        let i = counts.findIndex(c => c > 0);
-        
-        // 刻子（同じ3枚）
-        if (counts[i] >= 3) {
-            counts[i] -= 3;
-            if (canFormMentsu(counts)) return true;
-            counts[i] += 3;
-        }
-
-        // 順子（階段3枚 / 字牌以外）
-        if (i < 27 && i % 9 <= 6 && counts[i+1] > 0 && counts[i+2] > 0) {
-            counts[i]--; counts[i+1]--; counts[i+2]--;
-            if (canFormMentsu(counts)) return true;
-            counts[i]++; counts[i+1]++; counts[i+2]++;
-        }
-
-        return false;
     }
 
     initGame();
