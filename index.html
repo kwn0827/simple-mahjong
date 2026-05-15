@@ -33,6 +33,115 @@
       text-align: center;
       text-shadow: 0 1px 2px #000;
     }
+    /* ゲーム本体＋初心者ガイド：広い画面は横並び、狭い画面はガイドを下へ */
+    #game-layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 10px 20px;
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+    #table-wrap {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 980px;
+    }
+    /* 右カラム：固定幅・縦スクロール（sticky でプレイ中も常に近くに） */
+    #beginner-panel {
+      flex: 0 0 300px;
+      width: 300px;
+      max-width: 100%;
+      align-self: flex-start;
+      position: sticky;
+      top: 8px;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
+      padding: 10px 12px;
+      background: rgba(12, 24, 18, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+      color: #f8faf8;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    #beginner-panel h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff9c4;
+      letter-spacing: 0.02em;
+      border-bottom: 2px solid rgba(255, 213, 79, 0.45);
+      padding-bottom: 6px;
+    }
+    #beginner-panel h3 {
+      margin: 12px 0 6px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #e1f5fe;
+    }
+    #beginner-panel .guide-block:first-of-type h3 {
+      margin-top: 0;
+    }
+    #guide-situation {
+      margin: 0;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      border-left: 4px solid var(--accent);
+      font-weight: 600;
+      color: #fffef5;
+    }
+    #guide-steps {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+    #guide-steps li {
+      margin: 4px 0;
+    }
+    #beginner-panel .rules-list {
+      margin: 0;
+      padding-left: 1.1rem;
+    }
+    #beginner-panel .rules-list li {
+      margin: 5px 0;
+    }
+    /* 用語：details で開閉（アコーディオン風） */
+    #beginner-panel details.term {
+      margin: 4px 0;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.22);
+      padding: 2px 8px 6px;
+    }
+    #beginner-panel details.term summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: #ffe082;
+      list-style-position: outside;
+    }
+    #beginner-panel details.term p {
+      margin: 6px 0 0;
+      font-size: 0.84rem;
+      color: #eceff1;
+    }
+    @media (max-width: 900px) {
+      #game-layout {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      #beginner-panel {
+        flex: 1 1 auto;
+        width: 100%;
+        position: relative;
+        top: auto;
+        max-height: none;
+        order: 3;
+      }
+    }
     /* 全体レイアウト：中央に河、下に自分、上左右にCPU */
     #table {
       display: grid;
@@ -59,22 +168,57 @@
       justify-content: center;
       min-height: 52px;
     }
-    /* Unicode牌の見た目 */
+    /* Unicode牌の見た目：麻雀牌ブロック（U+1F000付近）は本文フォントに無いことが多いので、絵文字/記号系を明示 */
     .tile {
       display: inline-flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      position: relative;
       width: 42px;
       height: 56px;
+      min-width: 42px;
+      min-height: 56px;
+      flex-shrink: 0;
       background: var(--tile-bg);
       border: 2px solid var(--tile-border);
       border-radius: 6px;
-      font-size: 34px;
-      line-height: 1;
+      font-size: 36px;
+      line-height: 1.05;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Sans Symbols 2", "Noto Sans Symbols", "Segoe UI Symbol", "Twemoji Mozilla", "Noto Color Emoji", sans-serif;
+      font-variant-emoji: emoji;
+      color: #1a1a1a;
+      overflow: visible;
       cursor: default;
       user-select: none;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
       transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    }
+    .tile .tile-uc {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1 1 auto;
+      line-height: 1;
+    }
+    /* プライマリは常に Unicode 牌。フォント欠如で幅が極端に狭いときだけ .tile--with-fallback で表示（下の JS 参照） */
+    .tile .tile-fallback {
+      display: none;
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 700;
+      color: #2c2c2c;
+      opacity: 0.72;
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .tile.tile--with-fallback .tile-fallback {
+      display: block;
     }
     .tile.clickable { cursor: pointer; }
     .tile.clickable:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45); }
@@ -103,7 +247,14 @@
     }
     .river-box h3 { margin: 0 0 4px; font-size: 0.8rem; font-weight: 600; opacity: 0.95; }
     .river-tiles { display: flex; flex-wrap: wrap; gap: 3px; min-height: 40px; }
-    .river-tiles .tile { width: 34px; height: 46px; font-size: 28px; }
+    .river-tiles .tile {
+      width: 34px;
+      height: 46px;
+      min-width: 34px;
+      min-height: 46px;
+      font-size: 30px;
+    }
+    .river-tiles .tile .tile-fallback { font-size: 8px; bottom: 1px; }
     /* 座席配置：上=西、左=北、右=南、下=東（自分） */
     #seat-north { grid-column: 2; grid-row: 1; }
     #seat-west { grid-column: 1; grid-row: 2; align-self: center; }
@@ -159,6 +310,7 @@
     .overlay-card {
       background: linear-gradient(145deg, #fff8e1, #ffe082);
       color: #1a1a1a;
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif, "Segoe UI Emoji", "Apple Color Emoji", "Noto Sans Symbols 2", "Segoe UI Symbol", sans-serif;
       padding: 28px 36px;
       border-radius: 16px;
       text-align: center;
@@ -169,7 +321,13 @@
     .overlay-card h2 { margin: 0 0 12px; font-size: 1.8rem; }
     .overlay-card p { margin: 0 0 16px; font-size: 1rem; }
     @media (max-width: 720px) {
-      .tile { width: 36px; height: 48px; font-size: 28px; }
+      .tile {
+        width: 36px;
+        height: 48px;
+        min-width: 36px;
+        min-height: 48px;
+        font-size: 30px;
+      }
       #table { grid-template-columns: 1fr; grid-template-rows: auto; }
       #seat-west, #seat-east { grid-column: 1; grid-row: auto; }
       #center { grid-column: 1; grid-row: auto; }
@@ -178,6 +336,9 @@
   </style>
 </head>
 <body>
+  <!-- メイン卓＋右ガイドを横並び（狭い画面は CSS で縦積み） -->
+  <div id="game-layout">
+  <div id="table-wrap">
   <h1>簡易麻雀（4人・ノーメンツ・Unicode牌のみ）</h1>
   <p id="turn-line" style="text-align:center;margin:0 8px 6px;font-size:0.95rem;font-weight:700;color:#fffde7;text-shadow:0 1px 2px #000;"></p>
   <div id="table">
@@ -226,6 +387,54 @@
         </div>
       </div>
     </div>
+  </div>
+  </div>
+
+  <!-- 初心者向け常時ガイド（JS の refreshBeginnerPanel で同期更新） -->
+  <aside id="beginner-panel" aria-label="初心者向けガイド">
+    <h2>初心者ガイド</h2>
+
+    <div class="guide-block">
+      <h3>今の状況</h3>
+      <p id="guide-situation">読み込み中…</p>
+    </div>
+
+    <div class="guide-block">
+      <h3>次にやること</h3>
+      <ol id="guide-steps"></ol>
+    </div>
+
+    <div class="guide-block">
+      <h3>用語ミニ辞典</h3>
+      <details class="term"><summary>ツモ</summary><p>山から自分の手に引く1枚。ここでは自動で配られます。</p></details>
+      <details class="term"><summary>ロン</summary><p>他家が捨てた牌で和了すること。このゲームではあなただけがロンできます。</p></details>
+      <details class="term"><summary>リーチ</summary><p>テンパイ宣言の簡易版。宣言後はこの巡はツモ切りのみです。</p></details>
+      <details class="term"><summary>河（かわ）</summary><p>各プレイヤーが捨てた牌が並ぶ場所。誰が何を切ったかが分かります。</p></details>
+      <details class="term"><summary>手牌</summary><p>まだ表に出していない、自分の手元の牌の束です。</p></details>
+      <details class="term"><summary>面子（メンツ）</summary><p>順子（123など）か刻子（111など）のまとまり。標準形は面子×4です。</p></details>
+      <details class="term"><summary>雀頭（ジャントウ）</summary><p>同じ牌2枚の対子。和了形では必ず1組あります。</p></details>
+      <details class="term"><summary>捨て牌</summary><p>手牌から選んで河へ出した牌。CPUの捨て牌でロンが発生し得ます。</p></details>
+      <details class="term"><summary>親</summary><p>その局のスタート手番の家。ここでは東（あなた）が親相当です。</p></details>
+      <details class="term"><summary>ターン</summary><p>ツモ→打牌を行う順番。画面の「番」表示と一致します。</p></details>
+      <details class="term"><summary>鳴き（副露）</summary><p>ポン・チー・カンなど。本ゲームではルール上できません。</p></details>
+      <details class="term"><summary>門前（メンゼン）</summary><p>鳴かずに手牌だけで進める状態。全員が門前です。</p></details>
+      <details class="term"><summary>テンパイ</summary><p>あと1枚で和了形になりうる状態。リーチボタンはその目安です。</p></details>
+      <details class="term"><summary>流局</summary><p>山が尽きて誰も和了しなかった終わり方。やり直しで次の局へ。</p></details>
+      <details class="term"><summary>局（きょく）</summary><p>1回分の対局単位。「局をやり直す」で牌が配り直されます。</p></details>
+    </div>
+
+    <div class="guide-block">
+      <h3>ルール超要約</h3>
+      <ul class="rules-list">
+        <li>牌は合計136枚（萬筒索の数牌＋字牌）。山から順にツモります。</li>
+        <li>鳴きなし・門前のみ。ポン・チー・カンは出せません。</li>
+        <li>和了形は「面子4＋雀頭1」の標準形のみ（七対子は未対応）。</li>
+        <li>役は判定しません。役なしでもツモ・ロンで勝てます。</li>
+        <li>リーチはテンパイ時にボタン。宣言後はその巡はツモ切りのみの簡略ルールです。</li>
+        <li>ロンは捨て牌が出た瞬間だけ判断します（見送りで次の手番へ）。</li>
+      </ul>
+    </div>
+  </aside>
   </div>
 
   <!-- ツモ和了オーバーレイ -->
@@ -292,6 +501,59 @@
         33: 0x1f004  // 中 🀄
       };
       return String.fromCodePoint(honorMap[idx] || 0x1f004);
+    }
+
+    /** コンパクト表記（1m/9p/1s/東 等）。Unicode 牌を優先し、フォント欠如時のみ補助表示に使う */
+    function tileCompactLabel(idx) {
+      if (idx >= 0 && idx <= 8) return (idx + 1) + 'm';
+      if (idx >= 9 && idx <= 17) return (idx - 8) + 'p';
+      if (idx >= 18 && idx <= 26) return (idx - 17) + 's';
+      const honor = ['東', '南', '西', '北', '白', '發', '中'];
+      if (idx >= 27 && idx <= 33) return honor[idx - 27];
+      return '?';
+    }
+
+    let _mahjongGlyphNarrow = null;
+    /**
+     * 麻雀牌ブロックのグリフが「極端に狭い＝欠グリフの置換や不適切なフォールバック」の疑いがあるかを一度だけ検査する。
+     * true のときだけ .tile--with-fallback を付け、tileCompactLabel を重ねる（主表示は常に codepoint のまま）。
+     */
+    function mahjongGlyphLikelyUnsupported() {
+      if (_mahjongGlyphNarrow !== null) return _mahjongGlyphNarrow;
+      const test = document.createElement('span');
+      test.setAttribute('aria-hidden', 'true');
+      test.style.cssText = [
+        'position:fixed',
+        'left:-9999px',
+        'top:0',
+        'visibility:hidden',
+        'pointer-events:none',
+        'display:inline-flex',
+        'font-size:36px',
+        'line-height:1.05',
+        'font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Sans Symbols 2","Noto Sans Symbols","Segoe UI Symbol","Twemoji Mozilla","Noto Color Emoji",sans-serif',
+        'font-variant-emoji:emoji'
+      ].join(';');
+      test.textContent = String.fromCodePoint(0x1f007);
+      document.body.appendChild(test);
+      const w = test.getBoundingClientRect().width;
+      document.body.removeChild(test);
+      _mahjongGlyphNarrow = w < 24;
+      return _mahjongGlyphNarrow;
+    }
+
+    function populateTileElement(el, tileIndex) {
+      el.textContent = '';
+      const uc = document.createElement('span');
+      uc.className = 'tile-uc';
+      uc.textContent = tileUnicode(tileIndex);
+      const fb = document.createElement('span');
+      fb.className = 'tile-fallback';
+      fb.setAttribute('aria-hidden', 'true');
+      fb.textContent = tileCompactLabel(tileIndex);
+      el.appendChild(uc);
+      el.appendChild(fb);
+      if (mahjongGlyphLikelyUnsupported()) el.classList.add('tile--with-fallback');
     }
 
     /** 136枚の山を生成（萬筒索1-9×4、風×4、三元×4） */
@@ -510,11 +772,72 @@
       btnWinClose: document.getElementById('btn-win-close'),
       btnRon: document.getElementById('btn-ron'),
       btnRonPass: document.getElementById('btn-ron-pass'),
-      turnLine: document.getElementById('turn-line')
+      turnLine: document.getElementById('turn-line'),
+      // 右カラム（初心者ガイド）の動的テキスト先
+      guideSituation: document.getElementById('guide-situation'),
+      guideSteps: document.getElementById('guide-steps')
     };
 
     function setMessage(text) {
       els.message.textContent = text;
+      // メッセージ更新と同タイミングでガイドも追従（renderAll 外の setMessage も拾う）
+      refreshBeginnerPanel();
+    }
+
+    /**
+     * 右カラム「今の状況」「次にやること」を state と同じ分岐基準で更新する。
+     * renderAll 内の turnLine / ボタン状態と整合させ、長文は #message に任せる。
+     */
+    function refreshBeginnerPanel() {
+      const h = state.hands[SEAT_EAST];
+      const isHumanTurn = state.phase === 'human_turn';
+      const lockedRiichi = state.humanRiichi && state.drawnIndex >= 0;
+      const canRiichiBtn = isHumanTurn && !state.humanRiichi && h.length === 14 && canRiichi14(h);
+
+      let situation = '';
+      const steps = [];
+
+      if (state.phase === 'ended') {
+        if (state.gameOver) {
+          situation = 'アガリ成立で局終了。結果を確認できます。';
+          steps.push('オーバーレイを閉じる。');
+          steps.push('「局をやり直す」で次の一局へ。');
+        } else {
+          situation = '流局（山切れなど）で局終了。';
+          steps.push('「局をやり直す」で牌を配り直す。');
+        }
+      } else if (state.phase === 'ron_prompt') {
+        situation = 'ロン可能：いまの捨て牌で和了形が完成しています。';
+        steps.push('「ロン！」で勝利、または「見送る」で次の手番へ。');
+        steps.push('迷ったら河に出た牌が自分の手に合うか想像してみる。');
+      } else if (state.phase === 'cpu_think') {
+        situation = 'CPUの番：' + SEAT_NAMES[state.current] + ' が打牌を選んでいます。';
+        steps.push('少し待つ（自動で進みます）。');
+        steps.push('各席の河の変化を眺めて次を予想。');
+      } else if (isHumanTurn) {
+        if (lockedRiichi) {
+          situation = 'リーチ宣言済み：この巡はツモ切り（右のツモ牌）のみです。';
+          steps.push('右に離れたツモ牌だけをクリックして捨てる。');
+        } else {
+          situation = 'あなたの番：ツモしたので手牌から1枚捨てます。';
+          if (canRiichiBtn) {
+            situation += ' リーチ宣言も可能です。';
+          }
+          steps.push('捨てたい牌を1枚クリック（水色枠は無難なヒント）。');
+          if (canRiichiBtn) {
+            steps.push('テンパイなら「リーチ」も検討（押したらこの巡は摸切りのみ）。');
+          }
+          steps.push('リーチしないなら、そのまま好きな牌を切ってOK。');
+        }
+      } else {
+        situation = '待機中：画面の表示が切り替わるまでそのままにしてください。';
+        steps.push('状態が変わったらこの欄を読み直す。');
+      }
+
+      els.guideSituation.textContent = situation;
+      els.guideSteps.innerHTML = steps.map(function (s) {
+        return '<li>' + s + '</li>';
+      }).join('');
     }
 
     /** 描画：CPU手牌は裏（指定外のため Unicode 裏牌は使わず茶色のマスク表示） */
@@ -560,7 +883,7 @@
       base.forEach(({ idx, t }) => {
         const span = document.createElement('span');
         span.className = 'tile';
-        span.textContent = tileUnicode(t);
+        populateTileElement(span, t);
         span.dataset.idx = String(idx);
         if (state.phase === 'human_turn' && !state.gameOver && !lockedRiichi) {
           span.classList.add('clickable');
@@ -575,7 +898,7 @@
       if (di >= 0 && di < hand.length) {
         const span = document.createElement('span');
         span.className = 'tile drawn';
-        span.textContent = tileUnicode(hand[di]);
+        populateTileElement(span, hand[di]);
         span.dataset.idx = String(di);
         if (state.phase === 'human_turn' && !state.gameOver) {
           span.classList.add('clickable');
@@ -596,7 +919,7 @@
         for (const t of state.rivers[s]) {
           const span = document.createElement('span');
           span.className = 'tile';
-          span.textContent = tileUnicode(t);
+          populateTileElement(span, t);
           box.appendChild(span);
         }
       }
