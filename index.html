@@ -2,86 +2,166 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>超シンプル麻雀</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicode Mahjong Beta</title>
     <style>
-        body { background: #225522; color: white; font-family: sans-serif; text-align: center; }
-        .board { display: flex; justify-content: center; gap: 10px; margin-top: 50px; }
+        body { background: #1a4a1a; color: white; font-family: 'Segoe UI Emoji', sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .board { background: #2e7d32; border: 10px solid #5d4037; border-radius: 10px; padding: 20px; margin-bottom: 20px; min-height: 200px; }
+        .hand { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 50px; }
         .tile {
-            width: 50px; height: 70px; background: white; color: black;
-            border-radius: 5px; line-height: 70px; font-size: 24px; font-weight: bold;
-            cursor: pointer; border: 2px solid #666;
+            width: 50px; height: 70px; background: #f5f5f5; color: #000;
+            border-radius: 4px; font-size: 45px; line-height: 70px;
+            cursor: pointer; user-select: none; transition: transform 0.1s;
+            box-shadow: 2px 2px 0 #999;
         }
-        .tile:hover { background: #eee; }
-        .info { margin-top: 20px; font-size: 20px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        .tile:hover { transform: translateY(-10px); background: #fff; }
+        .tile.tsumo { margin-left: 15px; border: 2px solid #ffeb3b; }
+        .info { background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; }
+        .msg { font-size: 1.2rem; color: #ffeb3b; margin: 10px 0; min-height: 1.5em; }
+        button { padding: 10px 20px; font-size: 1rem; border: none; border-radius: 5px; cursor: pointer; background: #ff9800; color: white; }
+        button:hover { background: #f57c00; }
     </style>
 </head>
 <body>
-    <h1>🀄 超シンプル麻雀 🀄</h1>
-    <p>同じ数字を3枚、または階段(123など)を3セット作りましょう！</p>
-    
-    <div id="hand" class="board"></div>
-    <div class="info">
-        <span id="status">自分の番です。捨てる牌を選んでください。</span><br><br>
-        <button onclick="resetGame()">ゲームをやり直す</button>
+
+<div class="container">
+    <h1>Unicode 1人麻雀</h1>
+    <div class="board">
+        <div id="hand" class="hand"></div>
     </div>
+    <div class="info">
+        <div id="status" class="msg">牌を選んで捨ててください</div>
+        <div id="message" class="msg"></div>
+        <button onclick="initGame()">ニューゲーム</button>
+    </div>
+</div>
 
-    <script>
-        // 牌のデータ (萬子 1-9 を各4枚)
-        let deck = [];
-        let hand = [];
+<script>
+    // Unicode 麻雀牌データ (萬子, 筒子, 索子, 字牌)
+    const TILE_MAP = [
+        ...Array.from({length: 9}, (_, i) => ({ id: i, char: String.fromCodePoint(0x1F007 + i), type: 'm', val: i + 1 })), // 萬子
+        ...Array.from({length: 9}, (_, i) => ({ id: i + 9, char: String.fromCodePoint(0x1F019 + i), type: 'p', val: i + 1 })), // 筒子
+        ...Array.from({length: 9}, (_, i) => ({ id: i + 18, char: String.fromCodePoint(0x1F010 + i), type: 's', val: i + 1 })), // 索子
+        ...Array.from({length: 7}, (_, i) => ({ id: i + 27, char: String.fromCodePoint(0x1F000 + i), type: 'z', val: i + 1 }))  // 字牌
+    ];
 
-        function initDeck() {
-            deck = [];
-            for (let i = 1; i <= 9; i++) {
-                for (let j = 0; j < 4; j++) deck.push(i);
+    let deck = [];
+    let hand = [];
+    let currentTsumo = null;
+
+    function initGame() {
+        // 山を作成（各4枚）
+        deck = [];
+        TILE_MAP.forEach(t => {
+            for(let i=0; i<4; i++) deck.push({...t});
+        });
+        shuffle(deck);
+
+        // 13枚配牌
+        hand = deck.splice(0, 13);
+        sortHand();
+        tsumo();
+    }
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function sortHand() {
+        hand.sort((a, b) => a.id - b.id);
+    }
+
+    function tsumo() {
+        if (deck.length === 0) {
+            document.getElementById('status').innerText = "流局です。";
+            return;
+        }
+        currentTsumo = deck.pop();
+        render();
+        if (checkWin([...hand, currentTsumo])) {
+            document.getElementById('message').innerText = "🎉 ホーラ（アガリ）！ 🎉";
+        } else {
+            document.getElementById('message').innerText = "";
+        }
+    }
+
+    function discard(index) {
+        // 手牌かツモ牌を入れ替える処理
+        if (index === -1) {
+            // ツモ切り（何もしない）
+        } else {
+            const temp = hand[index];
+            hand[index] = currentTsumo;
+            currentTsumo = temp; // 捨てる牌を一時的にツモ牌扱いにしてから排除
+        }
+        currentTsumo = null;
+        sortHand();
+        tsumo();
+    }
+
+    function render() {
+        const handDiv = document.getElementById('hand');
+        handDiv.innerHTML = '';
+
+        hand.forEach((tile, i) => {
+            const el = document.createElement('div');
+            el.className = 'tile';
+            el.innerHTML = tile.char;
+            el.onclick = () => discard(i);
+            handDiv.appendChild(el);
+        });
+
+        if (currentTsumo) {
+            const el = document.createElement('div');
+            el.className = 'tile tsumo';
+            el.innerHTML = currentTsumo.char;
+            el.onclick = () => discard(-1);
+            handDiv.appendChild(el);
+        }
+    }
+
+    // 簡易アガリ判定ロジック (4面子1雀頭)
+    function checkWin(allTiles) {
+        const counts = Array(34).fill(0);
+        allTiles.forEach(t => counts[TILE_MAP.findIndex(tm => tm.id === t.id)]++);
+
+        for (let i = 0; i < 34; i++) {
+            if (counts[i] >= 2) {
+                const copy = [...counts];
+                copy[i] -= 2; // 雀頭（ペア）を仮定
+                if (canFormMentsu(copy)) return true;
             }
-            deck.sort(() => Math.random() - 0.5);
+        }
+        return false;
+    }
+
+    function canFormMentsu(counts) {
+        if (counts.every(c => c === 0)) return true;
+
+        let i = counts.findIndex(c => c > 0);
+        
+        // 刻子（同じ3枚）
+        if (counts[i] >= 3) {
+            counts[i] -= 3;
+            if (canFormMentsu(counts)) return true;
+            counts[i] += 3;
         }
 
-        function drawTile() {
-            if (deck.length > 0) hand.push(deck.pop());
-            render();
-            checkWin();
+        // 順子（階段3枚 / 字牌以外）
+        if (i < 27 && i % 9 <= 6 && counts[i+1] > 0 && counts[i+2] > 0) {
+            counts[i]--; counts[i+1]--; counts[i+2]--;
+            if (canFormMentsu(counts)) return true;
+            counts[i]++; counts[i+1]++; counts[i+2]++;
         }
 
-        function discard(index) {
-            hand.splice(index, 1);
-            if (deck.length === 0) {
-                document.getElementById('status').innerText = "流局（引き分け）です。";
-                return;
-            }
-            drawTile();
-        }
+        return false;
+    }
 
-        function render() {
-            const handDiv = document.getElementById('hand');
-            handDiv.innerHTML = '';
-            hand.sort((a, b) => a - b).forEach((tile, index) => {
-                const el = document.createElement('div');
-                el.className = 'tile';
-                el.innerText = tile;
-                el.onclick = () => discard(index);
-                handDiv.appendChild(el);
-            });
-        }
-
-        // 簡易アガリ判定 (3枚セット×3 + 2枚)
-        function checkWin() {
-            // 本来は再帰的に判定しますが、ここでは超簡易的に「揃った！」というログを出す準備
-            // 実際の実装ではここに役判定ロジックを追加します
-            console.log("現在の形:", hand);
-        }
-
-        function resetGame() {
-            initDeck();
-            hand = [];
-            for (let i = 0; i < 10; i++) hand.push(deck.pop()); // 10枚配る
-            drawTile(); // 11枚目（ツモ）
-            document.getElementById('status').innerText = "捨てる牌を選んでください。";
-        }
-
-        resetGame();
-    </script>
+    initGame();
+</script>
 </body>
 </html>
